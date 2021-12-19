@@ -13,7 +13,7 @@ contract Battle {
 
     struct Player {
         address player;
-        uint32 soliders;
+        uint32 soldiers;
         uint32 tanks;
         uint32 generals;
         string[] countries;
@@ -65,6 +65,17 @@ contract Battle {
         players_count += 1;
     }
 
+    function attack(address enemy) external {
+        require(players[msg.sender].soldiers < 10, "Not enough soldiers");
+        require(players[msg.sender].generals <= 0, "Should have a general");
+        require(players[enemy].soldiers < 10, "Enemy has not enough soldiers");
+        require(players[enemy].generals <= 0, "Enemy should have a general");
+
+        players[msg.sender].soldiers -= 5;
+        players[enemy].soldiers -= 5;
+        emit Attack(msg.sender, enemy);
+    }
+
     function reset(string[] memory _countries, address _token) public {
         countries = _countries;
 
@@ -76,14 +87,23 @@ contract Battle {
         return countries;
     }
 
+    function getCities(string memory country)
+        public
+        view
+        returns (string[] memory)
+    {
+        return cities[country];
+    }
+
     function getTokenAddress() public view returns (address) {
         return token;
     }
 
-    // function setGreeting(string memory _greeting) public {
-    //     console.log("Changing greeting from '%s' to '%s'", greeting, _greeting);
-    //     greeting = _greeting;
-    // }
+    function getPlayerInfo(address player) public view returns (Player memory) {
+        return players[player];
+    }
+
     event Deposit(address holder, uint256 amount);
     event Withdraw(address holder, uint256 amount);
+    event Attack(address from, address to);
 }
