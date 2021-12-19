@@ -1,7 +1,15 @@
 {
-  "name": "hardhat-project",
+  "name": "battle",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network hardhat",
+    "deploy:ropsten": "npx hardhat run scripts/deploy.js --network ropsten",
+    "deploy:rinkeby": "npx hardhat run scripts/deploy.js --network rinkeby"
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.3",
+    "@nomiclabs/hardhat-etherscan": "^2.1.8",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "^4.4.1",
     "chai": "^4.3.4",

@@ -1,4 +1,4 @@
-const { countries } = "./constants";
+const { countries } = require("./constants");
 const hre = require("hardhat");
 const ethers = hre.ethers;
 require("dotenv").config();
@@ -10,7 +10,12 @@ async function main() {
 
   await battle.deployed();
 
-  console.log("battle deployed to:", battle.address);
+  await hre.run("verify:verify", {
+    address: battle.address,
+    constructorArguments: [countries, TOKEN_ADDRESS],
+  });
+
+  console.log("Battle deployed to:", battle.address);
 }
 
 main()
