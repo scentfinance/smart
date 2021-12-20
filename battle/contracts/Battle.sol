@@ -20,6 +20,7 @@ contract Battle {
         string[] cities;
     }
     mapping(address => Player) private players;
+    mapping(address => bool) private playersCheckin;
     uint256 public players_count;
 
     constructor(string[] memory _countries, address _token) {
@@ -49,16 +50,18 @@ contract Battle {
         string[] memory _cities
     ) external {
         require(players_count <= 5, "All players joined");
+        require(playersCheckin[msg.sender] == false, "Player already registered");
         players[msg.sender] = Player(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
+        playersCheckin[msg.sender] = true;
         players_count += 1;
         emit RegisterPlayer(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
     }
 
     function attack(address enemy) external {
-        require(players[msg.sender].soldiers < 10, "Not enough soldiers");
-        require(players[msg.sender].generals <= 0, "Should have a general");
-        require(players[enemy].soldiers < 10, "Enemy has not enough soldiers");
-        require(players[enemy].generals <= 0, "Enemy should have a general");
+        require(players[msg.sender].soldiers >= 10, "Not enough soldiers");
+        require(players[msg.sender].generals >= 1, "Should have a general");
+        require(players[enemy].soldiers >= 10, "Enemy has not enough soldiers");
+        require(players[enemy].generals >= 1, "Enemy should have a general");
 
         players[msg.sender].soldiers -= 5;
         players[enemy].soldiers -= 5;
