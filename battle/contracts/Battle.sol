@@ -1,11 +1,11 @@
-//SPDX-License-Identifier: GNU Public License
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "hardhat/console.sol";
 
 contract Battle {
-    address private token;
+    address public token;
     mapping(address => uint256) public balances;
 
     string[] private countries;
@@ -24,17 +24,12 @@ contract Battle {
 
     constructor(string[] memory _countries, address _token) {
         countries = _countries;
-
-        console.log("Deploying a Battle with main token: ", _token);
         token = _token;
         players_count = 0;
     }
 
     function deposit(uint256 _amount) external {
-        require(
-            IERC20(token).transferFrom(msg.sender, address(this), _amount),
-            "Transfer from failed"
-        );
+        require(IERC20(token).transferFrom(msg.sender, address(this), _amount), "Transfer from failed");
         balances[msg.sender] = balances[msg.sender] + _amount;
         emit Deposit(msg.sender, _amount);
     }
@@ -54,15 +49,9 @@ contract Battle {
         string[] memory _cities
     ) external {
         require(players_count <= 5, "All players joined");
-        players[msg.sender] = Player(
-            msg.sender,
-            _soldiers,
-            _tanks,
-            _generals,
-            _countries,
-            _cities
-        );
+        players[msg.sender] = Player(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
         players_count += 1;
+        emit RegisterPlayer(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
     }
 
     function attack(address enemy) external {
@@ -78,25 +67,16 @@ contract Battle {
 
     function reset(string[] memory _countries, address _token) public {
         countries = _countries;
-
-        console.log("Deploying a Battle with main token: ", _token);
         token = _token;
+        emit Reset(_countries, _token);
     }
 
     function getCountries() public view returns (string[] memory) {
         return countries;
     }
 
-    function getCities(string memory country)
-        public
-        view
-        returns (string[] memory)
-    {
+    function getCities(string memory country) public view returns (string[] memory) {
         return cities[country];
-    }
-
-    function getTokenAddress() public view returns (address) {
-        return token;
     }
 
     function getPlayerInfo(address player) public view returns (Player memory) {
@@ -105,5 +85,14 @@ contract Battle {
 
     event Deposit(address holder, uint256 amount);
     event Withdraw(address holder, uint256 amount);
+    event RegisterPlayer(
+        address player,
+        uint32 soldiers,
+        uint32 tanks,
+        uint32 generals,
+        string[] countries,
+        string[] cities
+    );
     event Attack(address from, address to);
+    event Reset(string[] countries, address token);
 }
