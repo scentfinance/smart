@@ -6,6 +6,7 @@ import "hardhat/console.sol";
 
 contract Battle {
     address public token;
+    address public admin;
     mapping(address => uint256) public balances;
 
     string[] private countries;
@@ -13,9 +14,9 @@ contract Battle {
 
     struct Player {
         address player;
-        uint32 soldiers;
-        uint32 tanks;
-        uint32 generals;
+        uint256 soldiers;
+        uint256 tanks;
+        uint256 generals;
         string[] countries;
         string[] cities;
     }
@@ -23,9 +24,14 @@ contract Battle {
     mapping(address => bool) private playersCheckin;
     uint256 public players_count;
 
-    constructor(string[] memory _countries, address _token) {
+    constructor(
+        string[] memory _countries,
+        address _token,
+        address _admin
+    ) {
         countries = _countries;
         token = _token;
+        admin = _admin;
         players_count = 0;
     }
 
@@ -43,9 +49,9 @@ contract Battle {
     }
 
     function registerPlayer(
-        uint32 _soldiers,
-        uint32 _tanks,
-        uint32 _generals,
+        uint256 _soldiers,
+        uint256 _tanks,
+        uint256 _generals,
         string[] memory _countries,
         string[] memory _cities
     ) external {
@@ -57,21 +63,72 @@ contract Battle {
         emit RegisterPlayer(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
     }
 
-    function attack(address enemy) external {
-        require(players[msg.sender].soldiers >= 10, "Not enough soldiers");
-        require(players[msg.sender].generals >= 1, "Should have a general");
-        require(players[enemy].soldiers >= 10, "Enemy has not enough soldiers");
-        require(players[enemy].generals >= 1, "Enemy should have a general");
+    function registerPlayerPayable(
+        uint256 _soldiers,
+        uint256 _tanks,
+        uint256 _generals,
+        string[] memory _countries,
+        string[] memory _cities,
+        uint256 _amount,
+        uint256 _bonus
+    ) external {
+        require(players_count <= 5, "All players joined");
+        require(playersCheckin[msg.sender] == false, "Player already registered");
+        require(_soldiers >= 100, "Not enough soldiers");
+        require(_tanks >= 5, "Not enough tanks");
+        require(_generals == 1, "Should only have 1 general");
+        require(_amount >= getMinimumPayableAmount(_soldiers, _generals, _tanks), "Not enough deposit");
+        require(IERC20(token).transferFrom(msg.sender, address(this), _amount), "Transfer from failed");
+        balances[msg.sender] = balances[msg.sender] + _amount;
 
-        players[msg.sender].soldiers -= 5;
-        players[enemy].soldiers -= 5;
-        emit Attack(msg.sender, enemy);
+        players[msg.sender] = Player(msg.sender, (_soldiers + _bonus), _tanks, _generals, _countries, _cities);
+        playersCheckin[msg.sender] = true;
+        players_count += 1;
+
+        emit RegisterPlayerPayable(msg.sender, _soldiers, _tanks, _generals, _countries, _cities, _amount, _bonus);
+    }
+
+    function attack(
+        address _enemy,
+        uint256 _attacker,
+        uint256 _defender
+    ) external {
+        require(players[msg.sender].soldiers >= 10, "Not enough soldiers");
+        require(players[msg.sender].generals == 1, "Should have a general");
+        require(players[_enemy].soldiers >= 10, "Enemy has not enough soldiers");
+        require(players[_enemy].generals == 1, "Enemy should have a general");
+
+        players[msg.sender].soldiers -= _attacker;
+        players[_enemy].soldiers -= _defender;
+
+        if (players[msg.sender].soldiers > players[_enemy].soldiers && players[_enemy].soldiers < 10) {
+            _finish(msg.sender, _enemy);
+        }
+
+        if (players[msg.sender].soldiers < players[_enemy].soldiers && players[msg.sender].soldiers < 10) {
+            _finish(_enemy, msg.sender);
+        }
+
+        emit Attack(msg.sender, _enemy);
+    }
+
+    function _finish(address _winner, address _loser) internal {
+        balances[_winner] += (balances[_loser] * 5) / 10;
+        balances[admin] += (balances[_loser] * 3) / 10;
     }
 
     function reset(string[] memory _countries, address _token) public {
         countries = _countries;
         token = _token;
         emit Reset(_countries, _token);
+    }
+
+    function getMinimumPayableAmount(
+        uint256 _soldiers,
+        uint256 _tanks,
+        uint256 _generals
+    ) private pure returns (uint256) {
+        return _soldiers * 1 + _tanks * 5 + _generals * 1 + 100;
     }
 
     function getCountries() public view returns (string[] memory) {
@@ -90,11 +147,21 @@ contract Battle {
     event Withdraw(address holder, uint256 amount);
     event RegisterPlayer(
         address player,
-        uint32 soldiers,
-        uint32 tanks,
-        uint32 generals,
+        uint256 soldiers,
+        uint256 tanks,
+        uint256 generals,
         string[] countries,
         string[] cities
+    );
+    event RegisterPlayerPayable(
+        address player,
+        uint256 soldiers,
+        uint256 tanks,
+        uint256 generals,
+        string[] countries,
+        string[] cities,
+        uint256 amount,
+        uint256 bonus
     );
     event Attack(address from, address to);
     event Reset(string[] countries, address token);
