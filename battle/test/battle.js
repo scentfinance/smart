@@ -1,6 +1,7 @@
 const { countries } = require("../scripts/constants");
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const Dai = artifacts.require("MockDai");
 require("dotenv").config();
 const TOKEN_ADDRESS = process.env.TOKEN_ADDRESS;
 
@@ -10,17 +11,38 @@ describe("Battle", function () {
     const battle = await Battle.deploy(countries, TOKEN_ADDRESS);
     await battle.deployed();
 
-    expect((await battle.getTokenAddress()).toLowerCase()).to.equal(
-      TOKEN_ADDRESS.toLowerCase()
-    );
+    expect((await battle.token()).toLowerCase()).to.equal(TOKEN_ADDRESS.toLowerCase());
+  });
 
-    // expect(await battle.greet()).to.equal("Hello, world!");
+  it("Should return countries", async function () {
+    const Battle = await ethers.getContractFactory("Battle");
+    const battle = await Battle.deploy(countries, TOKEN_ADDRESS);
+    await battle.deployed();
 
-    // const setGreetingTx = await battle.setGreeting("Hola, mundo!");
+    expect((await battle.getCountries())[0]).to.equal(countries[0]);
+  });
 
-    // // wait until the transaction is mined
-    // await setGreetingTx.wait();
+  it("Should reset the game", async function () {
+    const Battle = await ethers.getContractFactory("Battle");
+    const battle = await Battle.deploy(countries, TOKEN_ADDRESS);
+    await battle.deployed();
 
-    // expect(await battle.greet()).to.equal("Hola, mundo!");
+    const resetTx = await battle.reset(["a team", "b team"], TOKEN_ADDRESS);
+    await resetTx.wait();
+
+    expect((await battle.getCountries())[0]).to.equal("a team");
+  });
+
+  it("Should deposit DAI token", async function () {
+    const Battle = await ethers.getContractFactory("Battle");
+    const battle = await Battle.deploy(countries, TOKEN_ADDRESS);
+    await battle.deployed();
+
+    let amount = new BN("1000000000000000000");
+    let token = await Dai.new();
+    await token.approve(battle.address, amount);
+    await battle.deposit(amount, { from: accounts[0] });
+    let balance = await battle.balances(accounts[0]);
+    assert.isTrue(balance.eq(amount));
   });
 });
