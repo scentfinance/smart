@@ -1,126 +1,172 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
-contract Battle {
+contract Battle is Ownable {
     address public token;
-    address public admin;
-    mapping(address => uint256) public balances;
-
-    string[] private countries;
-    mapping(string => string[]) private cities;
-
     struct Player {
         address player;
         uint256 soldiers;
         uint256 tanks;
         uint256 generals;
-        string[] countries;
-        string[] cities;
+        string country;
     }
-    mapping(address => Player) private players;
+    mapping(address => mapping(string => uint256)) public balances;
+    mapping(address => mapping(string => Player)) public players;
+    mapping(address => string[]) public countriesOfPlayer;
+    mapping(string => address) public ownerOfCountry;
+    string[] public allCountries;
     mapping(address => bool) private playersCheckin;
-    uint256 public players_count;
+    uint256 public playersCount;
 
-    constructor(
-        string[] memory _countries,
-        address _token,
-        address _admin
-    ) {
-        countries = _countries;
+    uint256 public COUNTRY_SUPPORT = 100;
+    uint256 public FEE = 10;
+
+    constructor(string[] memory _countries, address _token) {
+        allCountries = _countries;
         token = _token;
-        admin = _admin;
-        players_count = 0;
+        playersCount = 0;
     }
 
-    function deposit(uint256 _amount) external {
+    function deposit(uint256 _amount, string memory _country) external {
+        require(ownerOfCountry[_country] == msg.sender, "It's not your country");
         require(IERC20(token).transferFrom(msg.sender, address(this), _amount), "Transfer from failed");
-        balances[msg.sender] = balances[msg.sender] + _amount;
-        emit Deposit(msg.sender, _amount);
+        balances[msg.sender][_country] += _amount;
+        emit Deposit(msg.sender, _amount, _country);
     }
 
-    function withdraw(uint256 _amount) external {
-        require(balances[msg.sender] >= _amount, "Withdraw amount failed");
+    function withdraw(uint256 _amount, string memory _country) external {
+        require(ownerOfCountry[_country] == msg.sender, "It's not your country");
+        require(balances[msg.sender][_country] >= _amount, "Withdraw amount failed");
         require(IERC20(token).transfer(msg.sender, _amount), "Transfer failed");
-        balances[msg.sender] = balances[msg.sender] - _amount;
-        emit Withdraw(msg.sender, _amount);
+        balances[msg.sender][_country] -= _amount;
+        emit Withdraw(msg.sender, _amount, _country);
     }
 
-    function registerPlayer(
-        uint256 _soldiers,
-        uint256 _tanks,
-        uint256 _generals,
-        string[] memory _countries,
-        string[] memory _cities
-    ) external {
-        require(players_count <= 5, "All players joined");
-        require(playersCheckin[msg.sender] == false, "Player already registered");
-        players[msg.sender] = Player(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
-        playersCheckin[msg.sender] = true;
-        players_count += 1;
-        emit RegisterPlayer(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
-    }
+    // function withdrawAll() external {
+    //     uint256 total;
+    //     for i=0, i < countriesOfPlayer[msg.sender], i++ {
+    //     total += balances[msg.sender][i]
+    //     balances[msg.sender][i] = 0;
+    //     }
+    //     require(total > FEE, "Nothing to withdraw");
+    //     require(IERC20(token).transfer(msg.sender, total - FEE), "Transfer failed");
+    //     require(IERC20(token).transfer(owner, FEE), "Transfer failed");
+    //     emit WithdrawAll(msg.sender, total);
+    // }
+
+    // function registerPlayer(
+    //     uint256 _soldiers,
+    //     uint256 _tanks,
+    //     uint256 _generals,
+    //     string[] memory _countries,
+    //     string[] memory _cities
+    // ) external {
+    //     require(playersCount <= 5, "All players joined");
+    //     require(playersCheckin[msg.sender] == false, "Player already registered");
+    //     players[msg.sender] = Player(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
+    //     playersCheckin[msg.sender] = true;
+    //     playersCount += 1;
+    //     emit RegisterPlayer(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
+    // }
 
     function registerPlayerPayable(
         uint256 _soldiers,
         uint256 _tanks,
         uint256 _generals,
-        string[] memory _countries,
-        string[] memory _cities,
+        string memory _country,
         uint256 _amount,
         uint256 _bonus
     ) external {
-        require(players_count <= 5, "All players joined");
+        // TODO: check if _country is in the allCountries list
+        require(playersCount <= 5, "All players joined");
         require(playersCheckin[msg.sender] == false, "Player already registered");
         require(_soldiers >= 100, "Not enough soldiers");
-        require(_tanks >= 5, "Not enough tanks");
+        require(_tanks >= 10, "Not enough tanks");
         require(_generals == 1, "Should only have 1 general");
-        require(_amount >= getMinimumPayableAmount(_soldiers, _generals, _tanks), "Not enough deposit");
-        require(IERC20(token).transferFrom(msg.sender, address(this), _amount), "Transfer from failed");
-        balances[msg.sender] = balances[msg.sender] + _amount;
+        require(_amount >= getMinimumPayableAmount(_soldiers, _generals, _tanks), "Not enough amount for deposit");
+        require(IERC20(token).transferFrom(msg.sender, address(this), _amount - FEE), "Transfer from failed");
+        require(IERC20(token).transfer(owner, FEE), "Transfer failed");
+        balances[msg.sender][_country] += _amount;
 
-        players[msg.sender] = Player(msg.sender, (_soldiers + _bonus), _tanks, _generals, _countries, _cities);
+        players[msg.sender][_country] = Player(msg.sender, _soldiers + _bonus, _tanks, _generals, _country);
+        ownerOfCountry[_country] = msg.sender;
+        countriesOfPlayer[msg.sender].push(_country);
+
         playersCheckin[msg.sender] = true;
-        players_count += 1;
+        playersCount += 1;
 
-        emit RegisterPlayerPayable(msg.sender, _soldiers, _tanks, _generals, _countries, _cities, _amount, _bonus);
+        emit RegisterPlayerPayable(msg.sender, _soldiers, _tanks, _generals, _country, _amount, _bonus);
     }
 
     function attack(
+        string memory _attackerCountry,
         address _enemy,
-        uint256 _attacker,
-        uint256 _defender
+        string memory _enemyCountry,
+        uint256 _attackerPoint,
+        uint256 _defenderPoint
     ) external {
-        require(players[msg.sender].soldiers >= 10, "Not enough soldiers");
-        require(players[msg.sender].generals == 1, "Should have a general");
-        require(players[_enemy].soldiers >= 10, "Enemy has not enough soldiers");
-        require(players[_enemy].generals == 1, "Enemy should have a general");
+        // TODO: use encoding as anyone can call this
+        require(players[msg.sender][_attackerCountry].soldiers >= 100, "Attacker has not enough soldiers");
+        require(players[msg.sender][_attackerCountry].generals == 1, "Attacker should have a general");
+        require(players[_enemy][_enemyCountry].soldiers >= 100, "Enemy has not enough soldiers");
+        require(players[_enemy][_enemyCountry].generals == 1, "Enemy should have a general");
+        // TODO: check if attacker and defender have enough amount of tokens
 
-        players[msg.sender].soldiers -= _attacker;
-        players[_enemy].soldiers -= _defender;
+        require(IERC20(token).transfer(owner, _attackerPoint / 10 + _defenderPoint / 10), "Transfer failed");
+        players[msg.sender][_attackerCountry].soldiers -= _attackerPoint;
+        players[_enemy][_enemyCountry].soldiers -= _defenderPoint;
 
-        if (players[msg.sender].soldiers > players[_enemy].soldiers && players[_enemy].soldiers < 10) {
+        if (
+            players[msg.sender][_attackerCountry].soldiers > players[_enemy][_enemyCountry].soldiers &&
+            players[_enemy][_enemyCountry].soldiers < 12
+        ) {
             _finish(msg.sender, _enemy);
         }
 
-        if (players[msg.sender].soldiers < players[_enemy].soldiers && players[msg.sender].soldiers < 10) {
+        if (
+            players[msg.sender][_attackerCountry].soldiers < players[_enemy][_enemyCountry].soldiers &&
+            players[msg.sender][_attackerCountry].soldiers < 12
+        ) {
             _finish(_enemy, msg.sender);
         }
 
-        emit Attack(msg.sender, _enemy);
+        emit Attack(msg.sender, _attackerCountry, _enemy, _enemyCountry, _attackerPoint, _defenderPoint);
     }
 
-    function _finish(address _winner, address _loser) internal {
-        balances[_winner] += (balances[_loser] * 5) / 10;
-        balances[admin] += (balances[_loser] * 3) / 10;
+    function _finish(
+        address _winner,
+        string memory _winnerCountry,
+        address _loser,
+        string memory _loserCountry
+    ) internal {
+        // check balance
+        require(IERC20(token).transfer(owner, (balances[_loser][_loserCountry] * 2) / 10), "Transfer failed");
+        balances[_winner][_winnerCountry] += (balances[_loser][_loserCountry] * 3) / 10;
+
+        // check player soldiers
+        players[_winner][_winnerCountry] += 100; // TODO: re calc
+        players[_loser][_loserCountry] += 50; // TODO: re calc
+
+        // check countries
+        countriesOfPlayer[_winner].push(_loserCountry);
+        // countriesOfPlayer[_loser] - _loserCountry <= TODO
+
+        // init winner's new country
+        players[_winner][_loserCountry].soldiers = 100;
+        players[_winner][_loserCountry].generals = 1;
+        players[_winner][_loserCountry].tanks = 10;
+        players[_winner][_loserCountry].country = _loserCountry;
+        players[_winner][_loserCountry].player = _winner;
     }
 
-    function reset(string[] memory _countries, address _token) public {
-        countries = _countries;
+    function reset(address _token) public onlyOwner {
+        // TODO: reset every thing
         token = _token;
-        emit Reset(_countries, _token);
+        emit Reset(_token);
     }
 
     function getMinimumPayableAmount(
@@ -128,41 +174,44 @@ contract Battle {
         uint256 _tanks,
         uint256 _generals
     ) private pure returns (uint256) {
-        return _soldiers * 1 + _tanks * 5 + _generals * 1 + 100;
+        return _soldiers * 1 + _tanks * 10 + _generals * 100 + COUNTRY_SUPPORT + FEE;
     }
 
-    function getCountries() public view returns (string[] memory) {
-        return countries;
+    function getPlayerCountries(address _player) public view returns (string[] memory) {
+        return countriesOfPlayer[_player];
     }
 
-    function getCities(string memory country) public view returns (string[] memory) {
-        return cities[country];
-    }
-
-    function getPlayerInfo(address player) public view returns (Player memory) {
-        return players[player];
+    function getPlayerCountryInfo(address _player, string _country) public view returns (Player memory) {
+        return players[_player][_country];
     }
 
     event Deposit(address holder, uint256 amount);
     event Withdraw(address holder, uint256 amount);
-    event RegisterPlayer(
-        address player,
-        uint256 soldiers,
-        uint256 tanks,
-        uint256 generals,
-        string[] countries,
-        string[] cities
-    );
+    // event WithdrawAll(address holder, uint256 amount);
+    // event RegisterPlayer(
+    //     address player,
+    //     uint256 soldiers,
+    //     uint256 tanks,
+    //     uint256 generals,
+    //     string[] countries,
+    //     string[] cities
+    // );
     event RegisterPlayerPayable(
         address player,
         uint256 soldiers,
         uint256 tanks,
         uint256 generals,
-        string[] countries,
-        string[] cities,
+        string country,
         uint256 amount,
         uint256 bonus
     );
-    event Attack(address from, address to);
-    event Reset(string[] countries, address token);
+    event Attack(
+        address from,
+        string countryFrom,
+        address to,
+        string countryTo,
+        uint256 attackerPoint,
+        uint256 defenderPoint
+    );
+    event Reset(address token);
 }
