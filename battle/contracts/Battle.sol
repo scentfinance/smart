@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
+/// @author flashdebugger
+/// @title battle contract for strategic game
 contract Battle is Ownable {
     address public token;
     struct Player {
@@ -14,20 +16,20 @@ contract Battle is Ownable {
         uint256 generals;
         string country;
     }
+    string[] public allCountries;
     mapping(address => mapping(string => uint256)) public balances;
     mapping(address => mapping(string => Player)) public players;
     mapping(address => string[]) public countriesOfPlayer;
     mapping(string => address) public ownerOfCountry;
-    string[] public allCountries;
-    mapping(address => bool) private playersCheckin;
+    mapping(address => bool) public playersCheckin;
     uint256 public playersCount;
-
+    uint256 public fee;
     uint256 public COUNTRY_SUPPORT = 100;
-    uint256 public FEE = 10;
 
     constructor(string[] memory _countries, address _token) {
         allCountries = _countries;
         token = _token;
+        fee = 10;
         playersCount = 0;
     }
 
@@ -52,9 +54,9 @@ contract Battle is Ownable {
     //     total += balances[msg.sender][i]
     //     balances[msg.sender][i] = 0;
     //     }
-    //     require(total > FEE, "Nothing to withdraw");
-    //     require(IERC20(token).transfer(msg.sender, total - FEE), "Transfer failed");
-    //     require(IERC20(token).transfer(owner, FEE), "Transfer failed");
+    //     require(total > fee, "Nothing to withdraw");
+    //     require(IERC20(token).transfer(msg.sender, total - fee), "Transfer failed");
+    //     require(IERC20(token).transfer(owner, fee), "Transfer failed");
     //     emit WithdrawAll(msg.sender, total);
     // }
 
@@ -87,9 +89,9 @@ contract Battle is Ownable {
         require(_soldiers >= 100, "Not enough soldiers");
         require(_tanks >= 10, "Not enough tanks");
         require(_generals == 1, "Should only have 1 general");
-        require(_amount >= getMinimumPayableAmount(_soldiers, _generals, _tanks), "Not enough amount for deposit");
-        require(IERC20(token).transferFrom(msg.sender, address(this), _amount - FEE), "Transfer from failed");
-        require(IERC20(token).transfer(owner, FEE), "Transfer failed");
+        require(_amount >= _getMinimumPayableAmount(_soldiers, _generals, _tanks), "Not enough amount for deposit");
+        require(IERC20(token).transferFrom(msg.sender, address(this), _amount - fee), "Transfer from failed");
+        require(IERC20(token).transfer(owner(), fee), "Transfer failed");
         balances[msg.sender][_country] += _amount;
 
         players[msg.sender][_country] = Player(msg.sender, _soldiers + _bonus, _tanks, _generals, _country);
@@ -116,7 +118,7 @@ contract Battle is Ownable {
         require(players[_enemy][_enemyCountry].generals == 1, "Enemy should have a general");
         // TODO: check if attacker and defender have enough amount of tokens
 
-        require(IERC20(token).transfer(owner, _attackerPoint / 10 + _defenderPoint / 10), "Transfer failed");
+        require(IERC20(token).transfer(owner(), _attackerPoint / 10 + _defenderPoint / 10), "Transfer failed");
         players[msg.sender][_attackerCountry].soldiers -= _attackerPoint;
         players[_enemy][_enemyCountry].soldiers -= _defenderPoint;
 
@@ -124,14 +126,14 @@ contract Battle is Ownable {
             players[msg.sender][_attackerCountry].soldiers > players[_enemy][_enemyCountry].soldiers &&
             players[_enemy][_enemyCountry].soldiers < 12
         ) {
-            _finish(msg.sender, _enemy);
+            _finish(msg.sender, _attackerCountry, _enemy, _enemyCountry);
         }
 
         if (
             players[msg.sender][_attackerCountry].soldiers < players[_enemy][_enemyCountry].soldiers &&
             players[msg.sender][_attackerCountry].soldiers < 12
         ) {
-            _finish(_enemy, msg.sender);
+            _finish(_enemy, _enemyCountry, msg.sender, _attackerCountry);
         }
 
         emit Attack(msg.sender, _attackerCountry, _enemy, _enemyCountry, _attackerPoint, _defenderPoint);
@@ -144,12 +146,12 @@ contract Battle is Ownable {
         string memory _loserCountry
     ) internal {
         // check balance
-        require(IERC20(token).transfer(owner, (balances[_loser][_loserCountry] * 2) / 10), "Transfer failed");
+        require(IERC20(token).transfer(owner(), (balances[_loser][_loserCountry] * 2) / 10), "Transfer failed");
         balances[_winner][_winnerCountry] += (balances[_loser][_loserCountry] * 3) / 10;
 
         // check player soldiers
-        players[_winner][_winnerCountry] += 100; // TODO: re calc
-        players[_loser][_loserCountry] += 50; // TODO: re calc
+        players[_winner][_winnerCountry].soldiers += 100; // TODO: re calc
+        players[_loser][_loserCountry].soldiers += 50; // TODO: re calc
 
         // check countries
         countriesOfPlayer[_winner].push(_loserCountry);
@@ -163,30 +165,38 @@ contract Battle is Ownable {
         players[_winner][_loserCountry].player = _winner;
     }
 
-    function reset(address _token) public onlyOwner {
-        // TODO: reset every thing
+    function reset(address _token, uint256 _fee) public onlyOwner {
+        // TODO: reset balances, players, countriesOfPlayer, ownerOfCountry, allCountries, and playersCheckin
         token = _token;
-        emit Reset(_token);
+        fee = _fee;
+        playersCount = 0;
+        emit Reset(_token, _fee);
     }
 
-    function getMinimumPayableAmount(
+    /// @dev retrieves the sum of each payable amount
+    /// @return the minimum payable value for registered player info
+    function _getMinimumPayableAmount(
         uint256 _soldiers,
         uint256 _tanks,
         uint256 _generals
-    ) private pure returns (uint256) {
-        return _soldiers * 1 + _tanks * 10 + _generals * 100 + COUNTRY_SUPPORT + FEE;
+    ) private view returns (uint256) {
+        return _soldiers * 1 + _tanks * 10 + _generals * 100 + COUNTRY_SUPPORT + fee;
     }
 
+    /// @dev retrieves the value of the state variable `countriesOfPlayer`
+    /// @return the countries that player has
     function getPlayerCountries(address _player) public view returns (string[] memory) {
         return countriesOfPlayer[_player];
     }
 
-    function getPlayerCountryInfo(address _player, string _country) public view returns (Player memory) {
+    /// @dev retrieves the value of the state variable `players`
+    /// @return the player info for given country name
+    function getPlayerCountryInfo(address _player, string memory _country) public view returns (Player memory) {
         return players[_player][_country];
     }
 
-    event Deposit(address holder, uint256 amount);
-    event Withdraw(address holder, uint256 amount);
+    event Deposit(address holder, uint256 amount, string country);
+    event Withdraw(address holder, uint256 amount, string country);
     // event WithdrawAll(address holder, uint256 amount);
     // event RegisterPlayer(
     //     address player,
@@ -213,5 +223,5 @@ contract Battle is Ownable {
         uint256 attackerPoint,
         uint256 defenderPoint
     );
-    event Reset(address token);
+    event Reset(address token, uint256 fee);
 }
