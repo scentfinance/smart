@@ -26,6 +26,36 @@ contract Battle is Ownable {
     uint256 public fee;
     uint256 public COUNTRY_SUPPORT = 100;
 
+    event Deposit(address holder, uint256 amount, string country);
+    event Withdraw(address holder, uint256 amount, string country);
+    // event WithdrawAll(address holder, uint256 amount);
+    // event RegisterPlayer(
+    //     address player,
+    //     uint256 soldiers,
+    //     uint256 tanks,
+    //     uint256 generals,
+    //     string[] countries,
+    //     string[] cities
+    // );
+    event RegisterPlayerPayable(
+        address player,
+        uint256 soldiers,
+        uint256 tanks,
+        uint256 generals,
+        string country,
+        uint256 amount,
+        uint256 bonus
+    );
+    event Attack(
+        address from,
+        string countryFrom,
+        address to,
+        string countryTo,
+        uint256 attackerPoint,
+        uint256 defenderPoint
+    );
+    event Reset(address token, uint256 fee);
+
     constructor(string[] memory _countries, address _token) {
         allCountries = _countries;
         token = _token;
@@ -194,34 +224,4 @@ contract Battle is Ownable {
     function getPlayerCountryInfo(address _player, string memory _country) public view returns (Player memory) {
         return players[_player][_country];
     }
-
-    event Deposit(address holder, uint256 amount, string country);
-    event Withdraw(address holder, uint256 amount, string country);
-    // event WithdrawAll(address holder, uint256 amount);
-    // event RegisterPlayer(
-    //     address player,
-    //     uint256 soldiers,
-    //     uint256 tanks,
-    //     uint256 generals,
-    //     string[] countries,
-    //     string[] cities
-    // );
-    event RegisterPlayerPayable(
-        address player,
-        uint256 soldiers,
-        uint256 tanks,
-        uint256 generals,
-        string country,
-        uint256 amount,
-        uint256 bonus
-    );
-    event Attack(
-        address from,
-        string countryFrom,
-        address to,
-        string countryTo,
-        uint256 attackerPoint,
-        uint256 defenderPoint
-    );
-    event Reset(address token, uint256 fee);
 }
