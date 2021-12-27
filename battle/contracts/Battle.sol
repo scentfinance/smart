@@ -17,6 +17,7 @@ contract Battle is Ownable {
         string country;
     }
     string[] public allCountries;
+    string[] public allPlayers;
     mapping(address => mapping(string => uint256)) public balances;
     mapping(address => mapping(string => Player)) public players;
     mapping(address => string[]) public countriesOfPlayer;
@@ -59,7 +60,7 @@ contract Battle is Ownable {
     constructor(string[] memory _countries, address _token) {
         allCountries = _countries;
         token = _token;
-        fee = 10;
+        fee = 10 ether;
         playersCount = 0;
     }
 
@@ -128,6 +129,7 @@ contract Battle is Ownable {
         ownerOfCountry[_country] = msg.sender;
         countriesOfPlayer[msg.sender].push(_country);
 
+        allPlayers.push(msg.sender);
         playersCheckin[msg.sender] = true;
         playersCount += 1;
 
@@ -210,7 +212,7 @@ contract Battle is Ownable {
         uint256 _tanks,
         uint256 _generals
     ) private view returns (uint256) {
-        return _soldiers * 1 + _tanks * 10 + _generals * 100 + COUNTRY_SUPPORT + fee;
+        return (_soldiers * 1 + _tanks * 10 + _generals * 100 + COUNTRY_SUPPORT + fee) * 1 ether;
     }
 
     /// @dev retrieves the value of the state variable `countriesOfPlayer`
