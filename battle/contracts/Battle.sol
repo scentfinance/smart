@@ -17,7 +17,7 @@ contract Battle is Ownable {
         string country;
     }
     string[] public allCountries;
-    string[] public allPlayers;
+    address[] public allPlayers;
     mapping(address => mapping(string => uint256)) public balances;
     mapping(address => mapping(string => Player)) public players;
     mapping(address => string[]) public countriesOfPlayer;
@@ -120,7 +120,7 @@ contract Battle is Ownable {
         require(_soldiers >= 100, "Not enough soldiers");
         require(_tanks >= 10, "Not enough tanks");
         require(_generals == 1, "Should only have 1 general");
-        require(_amount >= _getMinimumPayableAmount(_soldiers, _generals, _tanks), "Not enough amount for deposit");
+        require(_amount >= getMinimumPayableAmount(_soldiers, _generals, _tanks), "Not enough amount for deposit");
         require(IERC20(token).transferFrom(msg.sender, address(this), _amount - fee), "Transfer from failed");
         require(IERC20(token).transfer(owner(), fee), "Transfer failed");
         balances[msg.sender][_country] += _amount;
@@ -207,12 +207,20 @@ contract Battle is Ownable {
 
     /// @dev retrieves the sum of each payable amount
     /// @return the minimum payable value for registered player info
-    function _getMinimumPayableAmount(
+    function getMinimumPayableAmount(
         uint256 _soldiers,
         uint256 _tanks,
         uint256 _generals
-    ) private view returns (uint256) {
-        return (_soldiers * 1 + _tanks * 10 + _generals * 100 + COUNTRY_SUPPORT + fee) * 1 ether;
+    ) public view returns (uint256) {
+        return (_soldiers * 1 + _tanks * 10 + _generals * 100 + COUNTRY_SUPPORT) * 1 ether + fee;
+    }
+
+    function getAllCountries() public view returns (string[] memory) {
+        return allCountries;
+    }
+
+    function getAllPlayers() public view returns (address[] memory) {
+        return allPlayers;
     }
 
     /// @dev retrieves the value of the state variable `countriesOfPlayer`
