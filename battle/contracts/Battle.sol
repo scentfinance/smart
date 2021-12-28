@@ -120,7 +120,7 @@ contract Battle is Ownable {
         require(_soldiers >= 100, "Not enough soldiers");
         require(_tanks >= 10, "Not enough tanks");
         require(_generals == 1, "Should only have 1 general");
-        require(_amount >= getMinimumPayableAmount(_soldiers, _generals, _tanks), "Not enough amount for deposit");
+        require(_amount >= getMinimumPayableAmount(_soldiers, _tanks, _generals), "Not enough amount for deposit");
         require(IERC20(token).transferFrom(msg.sender, address(this), _amount - fee), "Transfer from failed");
         require(IERC20(token).transfer(owner(), fee), "Transfer failed");
         balances[msg.sender][_country] += _amount;
