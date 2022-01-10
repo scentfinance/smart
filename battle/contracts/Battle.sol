@@ -31,7 +31,7 @@ contract Battle is Ownable {
     event Deposit(address holder, uint256 amount, string country);
     event Withdraw(address holder, uint256 amount, string country);
     event WithdrawAll(address holder, uint256 amount);
-    event EmegencyWithdraw(address owner, uint255 amount);
+    event EmegencyWithdraw(address owner, uint256 amount);
     event RegisterPlayerPayable(
         address player,
         uint256 soldiers,
@@ -76,12 +76,12 @@ contract Battle is Ownable {
     function withdrawAll() external {
         uint256 total;
         for (uint256 i = 0; i < countriesOfPlayer[msg.sender].length; i++) {
-            total += balances[msg.sender][i];
-            balances[msg.sender][i] = 0;
+            total += balances[msg.sender][countriesOfPlayer[msg.sender][i]];
+            balances[msg.sender][countriesOfPlayer[msg.sender][i]] = 0;
         }
         require(total > fee, "Nothing to withdraw");
         require(IERC20(token).transfer(msg.sender, total - fee), "Transfer failed");
-        require(IERC20(token).transfer(owner, fee), "Transfer failed");
+        require(IERC20(token).transfer(owner(), fee), "Transfer failed");
         emit WithdrawAll(msg.sender, total);
     }
 
