@@ -8,7 +8,6 @@ import "hardhat/console.sol";
 /// @author flashdebugger
 /// @title battle contract for strategic game
 contract Battle is Ownable {
-    address public token;
     struct Player {
         address player;
         uint256 soldiers;
@@ -16,8 +15,9 @@ contract Battle is Ownable {
         uint256 generals;
         string country;
     }
-    string[] public allCountries;
+    address public token;
     address[] public allPlayers;
+    string[] public allCountries;
     mapping(address => mapping(string => uint256)) public balances;
     mapping(address => mapping(string => Player)) public players;
     mapping(address => string[]) public countriesOfPlayer;
@@ -26,18 +26,12 @@ contract Battle is Ownable {
     uint256 public playersCount;
     uint256 public fee;
     uint256 public COUNTRY_SUPPORT = 100;
+    uint256 public totalBalance;
 
     event Deposit(address holder, uint256 amount, string country);
     event Withdraw(address holder, uint256 amount, string country);
-    // event WithdrawAll(address holder, uint256 amount);
-    // event RegisterPlayer(
-    //     address player,
-    //     uint256 soldiers,
-    //     uint256 tanks,
-    //     uint256 generals,
-    //     string[] countries,
-    //     string[] cities
-    // );
+    event WithdrawAll(address holder, uint256 amount);
+    event EmegencyWithdraw(address owner, uint255 amount);
     event RegisterPlayerPayable(
         address player,
         uint256 soldiers,
@@ -73,38 +67,30 @@ contract Battle is Ownable {
 
     function withdraw(uint256 _amount, string memory _country) external {
         require(ownerOfCountry[_country] == msg.sender, "It's not your country");
-        require(balances[msg.sender][_country] >= _amount, "Withdraw amount failed");
+        require(balances[msg.sender][_country] >= _amount, "Not enough withdraw amount");
         require(IERC20(token).transfer(msg.sender, _amount), "Transfer failed");
         balances[msg.sender][_country] -= _amount;
         emit Withdraw(msg.sender, _amount, _country);
     }
 
-    // function withdrawAll() external {
-    //     uint256 total;
-    //     for i=0, i < countriesOfPlayer[msg.sender], i++ {
-    //     total += balances[msg.sender][i]
-    //     balances[msg.sender][i] = 0;
-    //     }
-    //     require(total > fee, "Nothing to withdraw");
-    //     require(IERC20(token).transfer(msg.sender, total - fee), "Transfer failed");
-    //     require(IERC20(token).transfer(owner, fee), "Transfer failed");
-    //     emit WithdrawAll(msg.sender, total);
-    // }
+    function withdrawAll() external {
+        uint256 total;
+        for (uint256 i = 0; i < countriesOfPlayer[msg.sender].length; i++) {
+            total += balances[msg.sender][i];
+            balances[msg.sender][i] = 0;
+        }
+        require(total > fee, "Nothing to withdraw");
+        require(IERC20(token).transfer(msg.sender, total - fee), "Transfer failed");
+        require(IERC20(token).transfer(owner, fee), "Transfer failed");
+        emit WithdrawAll(msg.sender, total);
+    }
 
-    // function registerPlayer(
-    //     uint256 _soldiers,
-    //     uint256 _tanks,
-    //     uint256 _generals,
-    //     string[] memory _countries,
-    //     string[] memory _cities
-    // ) external {
-    //     require(playersCount <= 5, "All players joined");
-    //     require(playersCheckin[msg.sender] == false, "Player already registered");
-    //     players[msg.sender] = Player(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
-    //     playersCheckin[msg.sender] = true;
-    //     playersCount += 1;
-    //     emit RegisterPlayer(msg.sender, _soldiers, _tanks, _generals, _countries, _cities);
-    // }
+    function emegencyWithdraw() public onlyOwner {
+        require(totalBalance >= 10, "Not enough total balance");
+        require(IERC20(token).transfer(msg.sender, totalBalance), "Transfer failed");
+        totalBalance = 0;
+        emit EmegencyWithdraw(msg.sender, totalBalance);
+    }
 
     function registerPlayerPayable(
         uint256 _soldiers,
@@ -124,6 +110,7 @@ contract Battle is Ownable {
         require(IERC20(token).transferFrom(msg.sender, address(this), _amount - fee), "Transfer from failed");
         require(IERC20(token).transfer(owner(), fee), "Transfer failed");
         balances[msg.sender][_country] += _amount;
+        totalBalance += _amount;
 
         players[msg.sender][_country] = Player(msg.sender, _soldiers + _bonus, _tanks, _generals, _country);
         ownerOfCountry[_country] = msg.sender;
@@ -215,10 +202,12 @@ contract Battle is Ownable {
         return (_soldiers * 1 + _tanks * 10 + _generals * 100 + COUNTRY_SUPPORT) * 1 ether + fee;
     }
 
+    /// @return all countries
     function getAllCountries() public view returns (string[] memory) {
         return allCountries;
     }
 
+    /// @return all players list
     function getAllPlayers() public view returns (address[] memory) {
         return allPlayers;
     }
