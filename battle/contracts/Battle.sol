@@ -23,6 +23,7 @@ contract Battle is Ownable {
     mapping(address => string[]) public countriesOfPlayer;
     mapping(string => address) public ownerOfCountry;
     mapping(address => bool) public playersCheckin;
+    mapping(address => uint256) durationTime;
     uint256 public playersCount;
     uint256 public fee;
     uint256 public COUNTRY_SUPPORT = 100;
@@ -125,6 +126,7 @@ contract Battle is Ownable {
         allPlayers.push(msg.sender);
         playersCheckin[msg.sender] = true;
         playersCount += 1;
+        durationTime[msg.sender] = now + 1 minutes;
 
         emit RegisterPlayerPayable(msg.sender, _soldiers, _tanks, _generals, _country, _amount, _bonus);
     }
@@ -137,11 +139,27 @@ contract Battle is Ownable {
         uint256 _defenderPoint
     ) external {
         // TODO: use encoding as anyone can call this
+        require(durationTime[msg.sender] < now, "Wait for a minute");
         require(players[msg.sender][_attackerCountry].soldiers >= 100, "Attacker has not enough soldiers");
         require(players[msg.sender][_attackerCountry].generals == 1, "Attacker should have a general");
         require(players[_enemy][_enemyCountry].soldiers >= 100, "Enemy has not enough soldiers");
         require(players[_enemy][_enemyCountry].generals == 1, "Enemy should have a general");
-        // TODO: check if attacker and defender have enough amount of tokens
+        require(
+            balances[msg.sender][_attackerCountry] >=
+                getMinimumPayableAmount(
+                    players[msg.sender][_attackerCountry].soldiers,
+                    players[msg.sender][_attackerCountry].tanks,
+                    players[msg.sender][_attackerCountry].generals
+                )
+        );
+        require(
+            balances[_enemy][_enemyCountry] >=
+                getMinimumPayableAmount(
+                    players[_enemy][_enemyCountry].soldiers,
+                    players[_enemy][_enemyCountry].tanks,
+                    players[_enemy][_enemyCountry].generals
+                )
+        );
 
         require(IERC20(token).transfer(owner(), _attackerPoint / 10 + _defenderPoint / 10), "Transfer failed");
         players[msg.sender][_attackerCountry].soldiers -= _attackerPoint;
