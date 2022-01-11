@@ -126,7 +126,7 @@ contract Battle is Ownable {
         allPlayers.push(msg.sender);
         playersCheckin[msg.sender] = true;
         playersCount += 1;
-        durationTime[msg.sender] = now + 1 minutes;
+        durationTime[msg.sender] = block.timestamp + 1 minutes;
 
         emit RegisterPlayerPayable(msg.sender, _soldiers, _tanks, _generals, _country, _amount, _bonus);
     }
@@ -139,7 +139,7 @@ contract Battle is Ownable {
         uint256 _defenderPoint
     ) external {
         // TODO: use encoding as anyone can call this
-        require(durationTime[msg.sender] < now, "Wait for a minute");
+        require(durationTime[msg.sender] < block.timestamp, "Wait for a minute");
         require(players[msg.sender][_attackerCountry].soldiers >= 100, "Attacker has not enough soldiers");
         require(players[msg.sender][_attackerCountry].generals == 1, "Attacker should have a general");
         require(players[_enemy][_enemyCountry].soldiers >= 100, "Enemy has not enough soldiers");
@@ -216,10 +216,15 @@ contract Battle is Ownable {
     }
 
     function reset(address _token, uint256 _fee) public onlyOwner {
-        // TODO: reset balances, players, countriesOfPlayer, ownerOfCountry, allCountries, and playersCheckin
+        // reset token
         token = _token;
+
+        // reset fee
         fee = _fee;
+
+        // reset players count
         playersCount = 0;
+
         emit Reset(_token, _fee);
     }
 
