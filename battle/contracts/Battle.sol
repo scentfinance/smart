@@ -100,7 +100,13 @@ contract Battle is Ownable {
         uint256 _amount,
         uint256 _bonus
     ) external {
-        // TODO: check if _country is in the allCountries list
+        bool hasCountry = false;
+        for (uint256 i = 0; i < allCountries.length; i++) {
+            if (_compareStrings(allCountries[i], _country)) {
+                hasCountry = true;
+            }
+        }
+        require(hasCountry, "Country is not in the countries list");
         require(playersCount <= 5, "All players joined");
         require(playersCheckin[msg.sender] == false, "Player already registered");
         require(_soldiers >= 100, "Not enough soldiers");
@@ -174,7 +180,14 @@ contract Battle is Ownable {
 
         // check countries
         countriesOfPlayer[_winner].push(_loserCountry);
-        // countriesOfPlayer[_loser] - _loserCountry <= TODO
+
+        // remove country from loser's country list
+        for (uint256 i = 0; i < countriesOfPlayer[_loser].length; i++) {
+            if (_compareStrings(countriesOfPlayer[_loser][i], _loserCountry)) {
+                countriesOfPlayer[_loser][i] = countriesOfPlayer[_loser][countriesOfPlayer[_loser].length - 1];
+                delete countriesOfPlayer[_loser][countriesOfPlayer[_loser].length - 1];
+            }
+        }
 
         // init winner's new country
         players[_winner][_loserCountry].soldiers = 100;
@@ -190,6 +203,10 @@ contract Battle is Ownable {
         fee = _fee;
         playersCount = 0;
         emit Reset(_token, _fee);
+    }
+
+    function _compareStrings(string memory _a, string memory _b) private pure returns (bool) {
+        return (keccak256(abi.encodePacked((_a))) == keccak256(abi.encodePacked((_b))));
     }
 
     /// @dev retrieves the sum of each payable amount
