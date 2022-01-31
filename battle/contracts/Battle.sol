@@ -28,11 +28,13 @@ contract Battle is Ownable {
     uint256 public fee;
     uint256 public COUNTRY_SUPPORT = 100;
     uint256 public totalBalance;
+    uint256 public maxPlayers;
 
     event Deposit(address holder, uint256 amount, string country);
     event Withdraw(address holder, uint256 amount, string country);
     event WithdrawAll(address holder, uint256 amount);
     event EmegencyWithdraw(address owner, uint256 amount);
+    event AddCountry(address owner, string countryName);
     event RegisterPlayerPayable(
         address player,
         uint256 soldiers,
@@ -51,12 +53,18 @@ contract Battle is Ownable {
         uint256 defenderPoint
     );
     event Reset(address token, uint256 fee);
+    event SetFee(uint256 fee);
 
-    constructor(string[] memory _countries, address _token) {
+    constructor(
+        string[] memory _countries,
+        address _token,
+        uint256 _max
+    ) {
         allCountries = _countries;
         token = _token;
         fee = 10 ether;
         playersCount = 0;
+        maxPlayers = _max;
     }
 
     function deposit(uint256 _amount, string memory _country) external {
@@ -108,7 +116,7 @@ contract Battle is Ownable {
             }
         }
         require(hasCountry, "Country is not in the countries list");
-        require(playersCount <= 5, "All players joined");
+        require(playersCount <= maxPlayers, "All players joined");
         require(playersCheckin[msg.sender] == false, "Player already registered");
         require(_soldiers >= 100, "Not enough soldiers");
         require(_tanks >= 10, "Not enough tanks");
@@ -131,14 +139,16 @@ contract Battle is Ownable {
         emit RegisterPlayerPayable(msg.sender, _soldiers, _tanks, _generals, _country, _amount, _bonus);
     }
 
+    function addCountry(string memory _countryName) public onlyOwner {
+        allCountries.push(_countryName);
+        emit AddCountry(owner(), _countryName);
+    }
+
     function attack(
         string memory _attackerCountry,
         address _enemy,
-        string memory _enemyCountry,
-        uint256 _attackerPoint,
-        uint256 _defenderPoint
+        string memory _enemyCountry
     ) external {
-        // TODO: use encoding as anyone can call this
         require(durationTime[msg.sender] < block.timestamp, "Wait for a minute");
         require(players[msg.sender][_attackerCountry].soldiers >= 100, "Attacker has not enough soldiers");
         require(players[msg.sender][_attackerCountry].generals == 1, "Attacker should have a general");
@@ -161,9 +171,11 @@ contract Battle is Ownable {
                 )
         );
 
-        require(IERC20(token).transfer(owner(), _attackerPoint / 10 + _defenderPoint / 10), "Transfer failed");
-        players[msg.sender][_attackerCountry].soldiers -= _attackerPoint;
-        players[_enemy][_enemyCountry].soldiers -= _defenderPoint;
+        uint256 attackerPoint = _generateRandom(100);
+        uint256 defenderPoint = _generateRandom(90);
+        require(IERC20(token).transfer(owner(), attackerPoint / 10 + defenderPoint / 10), "Transfer failed");
+        players[msg.sender][_attackerCountry].soldiers -= attackerPoint;
+        players[_enemy][_enemyCountry].soldiers -= defenderPoint;
 
         if (
             players[msg.sender][_attackerCountry].soldiers > players[_enemy][_enemyCountry].soldiers &&
@@ -179,7 +191,7 @@ contract Battle is Ownable {
             _finish(_enemy, _enemyCountry, msg.sender, _attackerCountry);
         }
 
-        emit Attack(msg.sender, _attackerCountry, _enemy, _enemyCountry, _attackerPoint, _defenderPoint);
+        emit Attack(msg.sender, _attackerCountry, _enemy, _enemyCountry, attackerPoint, defenderPoint);
     }
 
     function _finish(
@@ -216,16 +228,20 @@ contract Battle is Ownable {
     }
 
     function reset(address _token, uint256 _fee) public onlyOwner {
-        // reset token
         token = _token;
-
-        // reset fee
         fee = _fee;
-
-        // reset players count
         playersCount = 0;
-
         emit Reset(_token, _fee);
+    }
+
+    function setFee(uint256 _fee) public onlyOwner {
+        fee = _fee;
+        emit SetFee(_fee);
+    }
+
+    function _generateRandom(uint256 mod) private view returns (uint256) {
+        uint256 rand = uint256(keccak256(abi.encodePacked(block.timestamp)));
+        return rand % mod;
     }
 
     function _compareStrings(string memory _a, string memory _b) private pure returns (bool) {
