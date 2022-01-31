@@ -1,4 +1,6 @@
 # smart
 All Smart Contracts
 
-[Play to earn](https://github.com/aesopfi/smart/tree/main/battle)
+[Battle (Enjoy to earn)](https://github.com/scentfinance/smart/tree/main/battle)
+
+[Staking (Rewards)](https://github.com/scentfinance/smart/tree/main/staking)
